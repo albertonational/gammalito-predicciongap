@@ -88,6 +88,14 @@ function startUpdates(material,envelope,tag,registry){
  },1000);
  frame.firstElementChild?.addEventListener?.('load',()=>void refreshPublication(),{once:true});
 }
+function resumeUpdates(){
+ if(document.hidden || !liveMaterial)return;
+ lastProbe=0;
+ void refreshPublication();
+}
+document.addEventListener?.('visibilitychange',resumeUpdates);
+globalThis.addEventListener?.('pageshow',resumeUpdates);
+globalThis.addEventListener?.('online',resumeUpdates);
 function render(payload){
  const registryText=JSON.stringify(payload.registry).replace(/</g,'\\u003c');
  const bridge='let registry='+registryText+';window.addEventListener("message",event=>{if(event.source!==parent||event.origin!=='+JSON.stringify(location.origin)+'||event.data?.type!=="gap-registry-update")return;registry=event.data.registry;window.dispatchEvent(new Event("gap-registry-update"));});window.fetch=async(input)=>{const path=new URL(typeof input==="string"?input:input.url,document.baseURI).pathname;if(path.endsWith("/data/registry.json"))return new Response(JSON.stringify(registry),{headers:{"Content-Type":"application/json"}});throw new Error("Recurso no disponible en esta publicación");};';
