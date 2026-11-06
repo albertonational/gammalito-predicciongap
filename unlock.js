@@ -6,16 +6,25 @@ const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
 let session;try{session=createSessionStore();}catch{}
 let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null;
 const rawRoot='https://raw.githubusercontent.com/albertonational/gammalito-predicciongap/main/';
-let liveHash=null, latestRegistryTime=0;
+let liveHash=null, latestRegistryTime=0, latestCut=0, lastProbe=0;
+function readCut(registry){
+ return (registry?.intraday_sessions||[]).reduce((last,s)=>Math.max(last,Date.parse(s.cutoff_at)||0),0);
+}
+function cadence(now){
+ const quarter=900000, elapsed=now%quarter;
+ return !document.hidden && elapsed<180000 && latestCut<now-elapsed ? 2000 : 15000;
+}
 const stamp=registry=>Date.parse(registry?.collector?.checked_at)||0;
 async function repositoryUpdate(){
  const options={cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(8000)};
- const pointer=await fetch(rawRoot+'live.sha256?t='+Math.floor(Date.now()/15000),options);
+ const compact=typeof DecompressionStream==='function';
+ const name=compact?'fast':'live';
+ const pointer=await fetch(rawRoot+name+'.sha256?t='+Math.floor(Date.now()/cadence(Date.now())),options);
  if(!pointer.ok)throw Error('POINTER_UNAVAILABLE');
  const hash=(await pointer.text()).trim();
  if(!/^[a-f0-9]{64}$/.test(hash))throw Error('INVALID_POINTER');
  if(hash===liveHash)return null;
- const bytes=await fetch(rawRoot+'site.enc?v='+hash,{...options,signal:AbortSignal.timeout(15000)});
+ const bytes=await fetch(rawRoot+(compact?'fast.enc':'site.enc')+'?v='+hash,{...options,signal:AbortSignal.timeout(15000)});
  if(!bytes.ok)throw Error('FEED_UNAVAILABLE');
  const body=await bytes.arrayBuffer();
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',body)),byte=>byte.toString(16).padStart(2,'0')).join('');
@@ -51,9 +60,16 @@ async function refreshPublication(){
   if(turn!==attempt)return;
   if(envelope.ciphertext===lastEnvelope){if(hash)liveHash=hash;return;}
   phase='decrypt';
-  const payload=await decryptWithMaterial(envelope,liveMaterial);if(turn!==attempt)return;
+  const payload=await decryptWithMaterial(envelope,liveMaterial);
+  if(payload.registry_gzip){
+   phase='unpack';
+   const compressed=Uint8Array.from(atob(payload.registry_gzip),c=>c.charCodeAt(0));
+   const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+   payload.registry=await new Response(stream).json();
+  }
+  if(turn!==attempt)return;
   if(stamp(payload.registry)<latestRegistryTime)return;
-  latestRegistryTime=stamp(payload.registry);
+  latestRegistryTime=stamp(payload.registry);latestCut=readCut(payload.registry);
   if(hash)liveHash=hash;
   frame.firstElementChild?.contentWindow.postMessage({type:'gap-registry-update',registry:payload.registry},location.origin);
   lastEnvelope=envelope.ciphertext;lastPublicationTag=tag||null;sessionNote.textContent='Publicación actualizada · '+new Date().toLocaleTimeString('es-MX',{timeZone:'America/New_York'})+' NY';
@@ -65,8 +81,11 @@ async function refreshPublication(){
 }
 function startUpdates(material,envelope,tag,registry){
  stopUpdates();liveMaterial=material;liveExpires=Date.now()+24*60*60*1000;lastEnvelope=envelope.ciphertext;lastPublicationTag=tag;
- latestRegistryTime=stamp(registry);
- pollTimer=setInterval(()=>void refreshPublication(),15000);
+ latestRegistryTime=stamp(registry);latestCut=readCut(registry);lastProbe=0;
+ pollTimer=setInterval(()=>{
+  const now=Date.now();
+  if(!pollBusy && now-lastProbe>=cadence(now)){lastProbe=now;void refreshPublication();}
+ },1000);
  frame.firstElementChild?.addEventListener?.('load',()=>void refreshPublication(),{once:true});
 }
 function render(payload){
