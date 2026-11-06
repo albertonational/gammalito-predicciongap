@@ -5,8 +5,25 @@ const entry=document.querySelector('#entry'),viewer=document.querySelector('#vie
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
 let session;try{session=createSessionStore();}catch{}
 let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null;
+const rawRoot='https://raw.githubusercontent.com/albertonational/gammalito-predicciongap/main/';
+let liveHash=null, latestRegistryTime=0;
+const stamp=registry=>Date.parse(registry?.collector?.checked_at)||0;
+async function repositoryUpdate(){
+ const options={cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(8000)};
+ const pointer=await fetch(rawRoot+'live.sha256?t='+Math.floor(Date.now()/15000),options);
+ if(!pointer.ok)throw Error('POINTER_UNAVAILABLE');
+ const hash=(await pointer.text()).trim();
+ if(!/^[a-f0-9]{64}$/.test(hash))throw Error('INVALID_POINTER');
+ if(hash===liveHash)return null;
+ const bytes=await fetch(rawRoot+'site.enc?v='+hash,{...options,signal:AbortSignal.timeout(15000)});
+ if(!bytes.ok)throw Error('FEED_UNAVAILABLE');
+ const body=await bytes.arrayBuffer();
+ const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',body)),byte=>byte.toString(16).padStart(2,'0')).join('');
+ if(digest!==hash)throw Error('INCOMPLETE_PUBLICATION');
+ return {envelope:JSON.parse(new TextDecoder().decode(body)),hash};
+}
 const sessionNote=document.querySelector('#session-note');
-function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
+function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
  ++attempt;stopUpdates();frame.replaceChildren();viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
@@ -16,21 +33,41 @@ async function refreshPublication(){
  if(Date.now()>=liveExpires){await closeAccess('El acceso de 24 horas venció. Introduce tu contraseña.');return;}
  const turn=attempt;pollBusy=true;let phase='download';
  try{
-  if(lastPublicationTag){const head=await fetch('./site.enc',{method:'HEAD',cache:'no-store'});if(head.ok&&(head.headers?.get('etag')||head.headers?.get('last-modified'))===lastPublicationTag){sessionNote.textContent='Publicación comprobada · acceso conservado en esta pestaña.';return;}}
-  const response=await fetch('./site.enc',{cache:'no-store'});if(!response.ok)throw Error('SOURCE_UNAVAILABLE');
-  const envelope=await response.json();if(envelope.ciphertext===lastEnvelope)return;phase='decrypt';
+  let envelope,hash,tag;
+  try {
+   const update=await repositoryUpdate();
+   if(!update||turn!==attempt)return;
+   ({envelope,hash}=update);
+  } catch {
+   if(turn!==attempt)return;
+   const head=await fetch('./site.enc',{method:'HEAD',cache:'no-store'});
+   tag=head.headers?.get('etag')||head.headers?.get('last-modified');
+   if(head.ok&&tag&&tag===lastPublicationTag)return;
+   const response=await fetch('./site.enc',{cache:'no-store'});
+   if(!response.ok)throw Error('SOURCE_UNAVAILABLE');
+   envelope=await response.json();
+   tag=response.headers?.get('etag')||response.headers?.get('last-modified');
+  }
+  if(turn!==attempt)return;
+  if(envelope.ciphertext===lastEnvelope){if(hash)liveHash=hash;return;}
+  phase='decrypt';
   const payload=await decryptWithMaterial(envelope,liveMaterial);if(turn!==attempt)return;
+  if(stamp(payload.registry)<latestRegistryTime)return;
+  latestRegistryTime=stamp(payload.registry);
+  if(hash)liveHash=hash;
   frame.firstElementChild?.contentWindow.postMessage({type:'gap-registry-update',registry:payload.registry},location.origin);
-  lastEnvelope=envelope.ciphertext;lastPublicationTag=response.headers?.get('etag')||response.headers?.get('last-modified')||null;sessionNote.textContent='Publicación actualizada · '+new Date().toLocaleTimeString('es-MX',{timeZone:'America/New_York'})+' NY';
+  lastEnvelope=envelope.ciphertext;lastPublicationTag=tag||null;sessionNote.textContent='Publicación actualizada · '+new Date().toLocaleTimeString('es-MX',{timeZone:'America/New_York'})+' NY';
  }catch{
   if(turn!==attempt)return;
   if(phase==='decrypt')await closeAccess('El acceso guardado ya no abre esta publicación. Introduce tu contraseña.');
   else sessionNote.textContent='No se pudo comprobar una publicación nueva; se conservan las horas visibles.';
  }finally{pollBusy=false;}
 }
-function startUpdates(material,envelope,tag){
+function startUpdates(material,envelope,tag,registry){
  stopUpdates();liveMaterial=material;liveExpires=Date.now()+24*60*60*1000;lastEnvelope=envelope.ciphertext;lastPublicationTag=tag;
- pollTimer=setInterval(()=>void refreshPublication(),60000);
+ latestRegistryTime=stamp(registry);
+ pollTimer=setInterval(()=>void refreshPublication(),15000);
+ frame.firstElementChild?.addEventListener?.('load',()=>void refreshPublication(),{once:true});
 }
 function render(payload){
  const registryText=JSON.stringify(payload.registry).replace(/</g,'\\u003c');
@@ -49,7 +86,7 @@ async function open(material,{restoring=false}={}){
   const envelope=await response.json();phase='decrypt';
   const payload=await decryptWithMaterial(envelope,material);phase='render';
   if(turn!==attempt)return;
-  render(payload);startUpdates(material,envelope,response.headers?.get('etag')||response.headers?.get('last-modified')||null);
+  render(payload);startUpdates(material,envelope,response.headers?.get('etag')||response.headers?.get('last-modified')||null,payload.registry);
   try{if(!session)throw Error("Storage unavailable");await session.remember(material);}catch{document.querySelector('#session-note').textContent='Este navegador no permitió conservar el acceso. Al recargar pedirá la contraseña.';}
   if(turn!==attempt)await session?.clear();
  }catch(error){
