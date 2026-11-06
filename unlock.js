@@ -14,6 +14,18 @@ function cadence(now){
  const quarter=900000, elapsed=now%quarter;
  return !document.hidden && elapsed<180000 && latestCut<now-elapsed ? 2000 : 15000;
 }
+let pendingView=null, nextBackupCheck=0, seenDirect=null, seenBackup=null;
+function deliver(registry){
+ const panel=frame.firstElementChild;
+ if(!panel?.contentWindow)return;
+ panel.contentWindow.postMessage({type:'gap-registry-update',registry},location.origin);
+}
+function checkVisibleCut(){
+ if(!pendingView)return;
+ const panel=frame.firstElementChild;
+ const shown=panel?.contentDocument?.querySelector('[data-live-cut]');
+ if(shown && Date.parse(shown.getAttribute('data-live-cut'))<latestCut)deliver(pendingView);
+}
 const stamp=registry=>Date.parse(registry?.collector?.checked_at)||0;
 async function repositoryUpdate(){
  const options={cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(8000)};
@@ -23,7 +35,7 @@ async function repositoryUpdate(){
  if(!pointer.ok)throw Error('POINTER_UNAVAILABLE');
  const hash=(await pointer.text()).trim();
  if(!/^[a-f0-9]{64}$/.test(hash))throw Error('INVALID_POINTER');
- if(hash===liveHash)return null;
+ if(hash===seenDirect || hash===liveHash)return null;
  const bytes=await fetch(rawRoot+(compact?'fast.enc':'site.enc')+'?v='+hash,{...options,signal:AbortSignal.timeout(15000)});
  if(!bytes.ok)throw Error('FEED_UNAVAILABLE');
  const body=await bytes.arrayBuffer();
@@ -32,7 +44,7 @@ async function repositoryUpdate(){
  return {envelope:JSON.parse(new TextDecoder().decode(body)),hash};
 }
 const sessionNote=document.querySelector('#session-note');
-function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
+function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
  ++attempt;stopUpdates();frame.replaceChildren();viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
@@ -42,20 +54,39 @@ async function refreshPublication(){
  if(Date.now()>=liveExpires){await closeAccess('El acceso de 24 horas venció. Introduce tu contraseña.');return;}
  const turn=attempt;pollBusy=true;let phase='download';
  try{
-  let envelope,hash,tag;
+  let envelope,hash,tag,fromDirect=false;
   try {
    const update=await repositoryUpdate();
-   if(!update||turn!==attempt)return;
-   ({envelope,hash}=update);
-  } catch {
    if(turn!==attempt)return;
-   const head=await fetch('./site.enc',{method:'HEAD',cache:'no-store'});
-   tag=head.headers?.get('etag')||head.headers?.get('last-modified');
-   if(head.ok&&tag&&tag===lastPublicationTag)return;
-   const response=await fetch('./site.enc',{cache:'no-store'});
-   if(!response.ok)throw Error('SOURCE_UNAVAILABLE');
-   envelope=await response.json();
-   tag=response.headers?.get('etag')||response.headers?.get('last-modified');
+   if(update){({envelope,hash}=update);fromDirect=true;}
+  }catch{ /* Keep the last valid registry while checking Pages. */ }
+  if(turn!==attempt)return;
+  if(!envelope){
+   checkVisibleCut();
+   const now=Date.now();
+   if(now<nextBackupCheck)return;
+   nextBackupCheck=now+15000;
+   // Pages can already contain a new cut even when the raw feed still returns its previous hash.
+   const nonce=Math.floor(now/15000);
+   const options={cache:'no-store',signal:AbortSignal.timeout(8000)};
+   const marker=await fetch('./fast.sha256?check='+nonce,options);
+   if(marker.ok && typeof DecompressionStream==='function' && typeof marker.text==='function'){
+    const checksum=(await marker.text()).trim();
+    if(checksum===liveHash || checksum===seenBackup)return;
+    if(/^[a-f0-9]{64}$/.test(checksum)){
+     const body=await fetch('./fast.enc?v='+checksum,{cache:'no-store',signal:AbortSignal.timeout(15000)});
+     if(!body.ok)throw Error('SOURCE_UNAVAILABLE');
+     const bytes=await body.arrayBuffer();
+     const actual=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
+     if(actual!==checksum)throw Error('INCOMPLETE_PUBLICATION');
+     envelope=JSON.parse(new TextDecoder().decode(bytes));hash=checksum;
+    }
+   }
+   if(!envelope){
+    const response=await fetch('./site.enc?check='+nonce,{cache:'no-store',signal:AbortSignal.timeout(15000)});
+    if(!response.ok)throw Error('SOURCE_UNAVAILABLE');
+    envelope=await response.json();
+   }
   }
   if(turn!==attempt)return;
   if(envelope.ciphertext===lastEnvelope){if(hash)liveHash=hash;return;}
@@ -68,10 +99,11 @@ async function refreshPublication(){
    payload.registry=await new Response(stream).json();
   }
   if(turn!==attempt)return;
-  if(stamp(payload.registry)<latestRegistryTime)return;
+  if(hash){if(fromDirect)seenDirect=hash;else seenBackup=hash;}
+  if(readCut(payload.registry)<latestCut || stamp(payload.registry)<latestRegistryTime)return;
   latestRegistryTime=stamp(payload.registry);latestCut=readCut(payload.registry);
   if(hash)liveHash=hash;
-  frame.firstElementChild?.contentWindow.postMessage({type:'gap-registry-update',registry:payload.registry},location.origin);
+  pendingView=payload.registry;deliver(pendingView);
   lastEnvelope=envelope.ciphertext;lastPublicationTag=tag||null;sessionNote.textContent='Publicación actualizada · '+new Date().toLocaleTimeString('es-MX',{timeZone:'America/New_York'})+' NY';
  }catch{
   if(turn!==attempt)return;
