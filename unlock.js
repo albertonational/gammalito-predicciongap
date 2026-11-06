@@ -8,7 +8,7 @@ let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,last
 const rawRoot='https://raw.githubusercontent.com/albertonational/gammalito-predicciongap/main/';
 let liveHash=null, latestRegistryTime=0, latestCut=0, lastProbe=0;
 function readCut(registry){
- return (registry?.intraday_sessions||[]).reduce((last,s)=>Math.max(last,Date.parse(s.cutoff_at)||0),0);
+ return (registry?.intraday_sessions||[]).reduce((last,s)=>Math.max(last,Date.parse(s.cutoff_at)||0),Date.parse(registry?.intraday_close?.cutoff_at)||0);
 }
 function cadence(now){
  const quarter=900000, elapsed=now%quarter;
