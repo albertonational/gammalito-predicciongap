@@ -2,6 +2,7 @@ import {passwordMaterial,decryptWithMaterial} from './crypto.mjs?v=20261031-3';
 import {createSessionStore} from './session.mjs?v=20261031-3';
 const form=document.querySelector('#unlock'),field=document.querySelector('#password'),button=document.querySelector('#submit'),status=document.querySelector('#status');
 const entry=document.querySelector('#entry'),viewer=document.querySelector('#viewer'),frame=document.querySelector('#frame');
+const historyFrame=document.querySelector('#history-frame'),historyToggle=document.querySelector('#history-toggle');
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
 let session;try{session=createSessionStore();}catch{}
 let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null;
@@ -19,6 +20,7 @@ function deliver(registry){
  const panel=frame.firstElementChild;
  if(!panel?.contentWindow)return;
  panel.contentWindow.postMessage({type:'gap-registry-update',registry},location.origin);
+ historyFrame.firstElementChild?.contentWindow?.postMessage({type:'gap-registry-update',registry},location.origin);
 }
 function checkVisibleCut(){
  if(!pendingView)return;
@@ -46,7 +48,7 @@ async function repositoryUpdate(){
 const sessionNote=document.querySelector('#session-note');
 function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
- ++attempt;stopUpdates();frame.replaceChildren();viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
+ ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
 }
 async function refreshPublication(){
@@ -135,7 +137,14 @@ function render(payload){
   .replace('<link rel="icon" href="./favicon.svg">','')
   .replace('<script type="module" src="./app.js"></script>',()=>'<script>'+safeScript(bridge)+'</script><script type="module">'+safeScript(payload.js)+'</script>');
  const iframe=document.createElement('iframe');iframe.title='Pronósticos y resultados de GAMMAlito';iframe.srcdoc=html;
- frame.replaceChildren(iframe);entry.hidden=true;viewer.hidden=false;status.textContent='';
+ frame.replaceChildren(iframe);historyFrame.replaceChildren();historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;
+ if(payload.history_js){
+  const h=document.createElement('iframe');h.title='Historial de entradas destacadas';
+  const style=`body{margin:0;background:#f4f5f1;color:#233e33;font:15px Arial,sans-serif}main{max-width:1000px;margin:auto;padding:25px}h1{font-size:25px}.filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;background:white;padding:16px;border-radius:12px}.filters label{display:grid;gap:5px;font-size:13px}.filters input,.filters select,.filters button{font:inherit;padding:8px;border:1px solid #bccbb5;border-radius:6px;background:white;color:#233e33}.notice{font-size:13px;color:#64746b;line-height:1.5}.day,.entry{background:white;border:1px solid #dce3d4;border-radius:10px;margin:10px 0;padding:12px}.entry{background:#f9fbf8;margin-left:10px}summary{cursor:pointer;line-height:1.6}summary span{font-size:12px;color:#607065;margin-left:10px}.call{color:#17804e}.put{color:#b44040}.detail{overflow:auto}.detail p{font-size:14px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #e1e7de;text-align:left}td small{display:block;color:#65736b;margin-top:3px}.empty{padding:20px;background:white;border-radius:8px}@media(max-width:600px){main{padding:14px}th,td{padding:7px;min-width:65px}}`;
+  h.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+style+'</style></head><body><main id="history-root"><p>Cargando historial…</p></main><script>'+safeScript(bridge)+'</script><script>'+safeScript(payload.history_js)+'</script></body></html>';
+  historyFrame.replaceChildren(h);
+ }
+ entry.hidden=true;viewer.hidden=false;status.textContent='';
 }
 async function open(material,{restoring=false}={}){
  const turn=++attempt;button.disabled=true;status.textContent=restoring?'Restaurando acceso…':'Abriendo…';let phase='download';
@@ -161,6 +170,7 @@ form.addEventListener('submit',async event=>{
  catch{status.textContent='No se pudo iniciar el acceso seguro. Usa HTTPS y recarga.';}
  finally{password='';}
 });
+historyToggle.addEventListener('click',()=>{const show=historyFrame.hidden;historyFrame.hidden=!show;frame.hidden=show;historyToggle.textContent=show?'Inicio':'Historial';});
 document.querySelector('#lock').addEventListener('click',()=>closeAccess());
 async function restore(){
  button.disabled=true;
@@ -169,3 +179,4 @@ async function restore(){
  finally{button.disabled=false;}
 }
 void restore();
+
