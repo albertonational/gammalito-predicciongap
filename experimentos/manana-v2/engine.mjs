@@ -1,23 +1,14 @@
-// MAÑANA V2 - laboratorio aislado. No altera las predicciones originales.
-// Entrada: snapshot congelado ANTES de la señal. No utiliza datos posteriores.
-export const TICKERS=['AAPL','AMZN','GLD','META','MSFT','NFLX','PLTR','QQQ','SPY','TSLA'];
+// MAÑANA V2: SPY y QQQ solamente. Laboratorio aislado, sin datos futuros.
+export const TICKERS=['SPY','QQQ'];
 const finite=x=>typeof x==='number'&&Number.isFinite(x);
-export function evaluate(snapshot){
- if(!snapshot||!TICKERS.includes(snapshot.ticker)||!['CALL','PUT'].includes(snapshot.side))
-  return {status:'SIN_DATOS',reasons:['Ticker o dirección inválidos'],score:null};
- const s=snapshot,dir=s.side==='CALL'?1:-1,checks=[];
- const check=(name,value,pass)=>checks.push({name,available:finite(value),pass:finite(value)?Boolean(pass(value)):null});
- // Los siguientes criterios son candidatos, NO umbrales optimizados ni validados.
- check('Distancia de Gamma Zero (%)',s.gammaZeroDistancePct,x=>dir*x>0);
- check('Momentum 15m (%)',s.momentum15mPct,x=>dir*x>0);
- check('Distancia del cierre previo (%)',s.fromPrevClosePct,x=>dir*x>=0);
- check('Persistencia: velas consecutivas',s.confirmingBars15m,x=>x>=2);
- const available=checks.filter(x=>x.available),passed=available.filter(x=>x.pass).length;
- return {status:available.length<4?'SIN_DATOS':passed===4?'FAVORABLE':passed>=2?'PRECAUCION':'DEBIL',
- score:available.length===4?passed+'/4':null,checks,
- reasons:checks.filter(x=>!x.available).map(x=>'Falta '+x.name)};
+export function evaluate(s){
+ if(!s||!TICKERS.includes(s.ticker)||!['CALL','PUT'].includes(s.side))return {side:null,reason:'SIN_DATOS'};
+ const needed=['gammaZeroDistancePct','momentum15mPct','fromPrevClosePct','confirmingBars15m'];
+ if(needed.some(k=>!finite(s[k])))return {side:null,reason:'SIN_DATOS'};
+ // Regla candidata, NO validada: solo devuelve CALL/PUT si hay confirmación.
+ const direction=s.side==='CALL'?1:-1;
+ const positive=[direction*s.gammaZeroDistancePct>0,direction*s.momentum15mPct>0,direction*s.fromPrevClosePct>=0,s.confirmingBars15m>=2].filter(Boolean).length;
+ // En caso de desacuerdo, no inventar una dirección.
+ return positive>=3?{side:s.side,reason:'CANDIDATO'}:{side:null,reason:'SIN_CONFIRMACION'};
 }
-export function compare(records){
- return records.map(r=>({date:r.date,ticker:r.snapshot?.ticker,original:r.snapshot?.side,
-  v2:evaluate(r.snapshot),outcome:r.outcome??'PENDIENTE'}));
-}
+export function compare(records){return records.filter(r=>TICKERS.includes(r.snapshot?.ticker)).map(r=>({date:r.date,ticker:r.snapshot.ticker,original:r.snapshot.side,v2:evaluate(r.snapshot).side,outcome:r.outcome??null}));}
