@@ -1,9 +1,9 @@
-import {evaluate,compare} from './engine.mjs';
-import assert from 'node:assert/strict';
-const base={ticker:'SPY',side:'CALL',gammaZeroDistancePct:0.2,momentum15mPct:0.3,fromPrevClosePct:0.4,confirmingBars15m:2};
-assert.equal(evaluate(base).status,'FAVORABLE');
-assert.equal(evaluate({...base,side:'PUT'}).status,'DEBIL');
-assert.equal(evaluate({...base,momentum15mPct:null}).status,'SIN_DATOS');
-assert.equal(evaluate({...base,ticker:'INVALID'}).status,'SIN_DATOS');
-assert.equal(compare([{date:'2026-11-05',snapshot:base}])[0].outcome,'PENDIENTE');
-console.log('MAÑANA V2: 5 pruebas correctas');
+import {evaluate,compare} from './engine.mjs';import assert from 'node:assert/strict';
+const s={ticker:'SPY',side:'CALL',gammaZeroDistancePct:0.2,momentum15mPct:0.3,fromPrevClosePct:0.4,confirmingBars15m:2};
+assert.equal(evaluate(s).side,'CALL');
+assert.equal(evaluate({...s,ticker:'QQQ'}).side,'CALL');
+assert.equal(evaluate({...s,ticker:'TSLA'}).side,null);
+assert.equal(evaluate({...s,momentum15mPct:null}).side,null);
+assert.equal(evaluate({...s,side:'PUT'}).side,null);
+assert.equal(compare([{date:'2026-11-05',snapshot:s},{date:'2026-11-05',snapshot:{...s,ticker:'TSLA'}}]).length,1);
+console.log('6 checks passed');
