@@ -1,4 +1,4 @@
-// MAÑANA V2: SPY y QQQ solamente. Laboratorio aislado, sin datos futuros.
+// GAP V2: SPY y QQQ solamente. Laboratorio aislado, sin datos futuros.
 export const TICKERS=['SPY','QQQ'];
 const finite=x=>typeof x==='number'&&Number.isFinite(x);
 export function evaluate(s){
