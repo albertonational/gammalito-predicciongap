@@ -24,3 +24,13 @@ Los números del ejemplo son ilustrativos, no datos reales.
 - No modificar GAP, ni el registro original, ni V1/V2/V3/V4/INTRADÍA.
 - No considerar 'FAVORABLE' como pronóstico validado.
 - Si falta cualquier campo, el motor devuelve SIN_DATOS.
+
+
+## Origen REAL localizado (11 nov 2026)
+Repositorio privado: albertonational/Options-Mobile
+- apps/gammalito-predicciongap/automation/close-forecast.mjs: genera pronóstico de próxima apertura solo SPY/QQQ con lecturas verificadas del cierre y 30 minutos antes; exige fuente Max Change · VOLUME 1m y ventana de 5 min.
+- apps/gammalito-predicciongap/automation/close-reconstructions.json: históricos reconstruidos, marcados explícitamente como no prospectivos.
+- apps/gammalito-predicciongap/automation/publish.mjs: publicación cifrada.
+- apps/gammalito-predicciongap/automation/CLOSE-FORECAST.md: contrato funcional.
+Regla original: CALL si delta precio >0 y delta Net GEX >0; PUT si ambos <0; si no INDECISO. Una contradicción respecto a Gamma Zero es contexto, no cambia el juicio.
+IMPORTANTE: El motor experimental anterior requiere campos no presentes en esta salida (momentum15mPct, fromPrevClosePct, confirmingBars15m). NO debe conectarse sin reescribirlo para usar exclusivamente evidencia realmente disponible y probarlo fuera de muestra. Tampoco se debe sustituir INDECISO o SIN DATOS por CALL/PUT ficticios.
