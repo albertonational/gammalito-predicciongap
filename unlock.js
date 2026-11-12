@@ -5,7 +5,7 @@ const entry=document.querySelector('#entry'),viewer=document.querySelector('#vie
 const historyFrame=document.querySelector('#history-frame'),historyToggle=document.querySelector('#history-toggle');
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
 let session;try{session=createSessionStore();}catch{}
-let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null;
+let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null,activeUiVersion='legacy';
 const rawRoot='https://raw.githubusercontent.com/albertonational/gammalito-predicciongap/main/';
 let liveHash=null, latestRegistryTime=0, latestCut=0, lastProbe=0;
 function readCut(registry){
@@ -101,6 +101,29 @@ async function refreshPublication(){
    payload.registry=await new Response(stream).json();
   }
   if(turn!==attempt)return;
+  // A fast update normally carries registry data only. When the app bundle changes,
+  // fetch the full encrypted site and replace the iframe, not just its registry.
+  if(payload.ui_version && payload.ui_version!==activeUiVersion){
+   const material=liveMaterial;
+   const options={cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(18000)};
+   let fullEnvelope;
+   try{
+    const res=await fetch(rawRoot+'site.enc?ui='+Date.now(),options);
+    if(!res.ok)throw Error('FULL_FEED_UNAVAILABLE');
+    fullEnvelope=await res.json();
+   }catch{
+    const res=await fetch('./site.enc?ui='+Date.now(),options);
+    if(!res.ok)throw Error('FULL_FEED_UNAVAILABLE');
+    fullEnvelope=await res.json();
+   }
+   const full=await decryptWithMaterial(fullEnvelope,material);
+   if(full.ui_version!==payload.ui_version)throw Error('UI_FEED_NOT_CURRENT');
+   if(turn!==attempt)return;
+   render(full);
+   startUpdates(material,fullEnvelope,null,full.registry);
+   sessionNote.textContent='Interfaz y datos actualizados · '+new Date().toLocaleTimeString('es-MX',{timeZone:'America/New_York'})+' NY';
+   return;
+  }
   if(hash){if(fromDirect)seenDirect=hash;else seenBackup=hash;}
   if(readCut(payload.registry)<latestCut || stamp(payload.registry)<latestRegistryTime)return;
   latestRegistryTime=stamp(payload.registry);latestCut=readCut(payload.registry);
@@ -131,6 +154,7 @@ document.addEventListener?.('visibilitychange',resumeUpdates);
 globalThis.addEventListener?.('pageshow',resumeUpdates);
 globalThis.addEventListener?.('online',resumeUpdates);
 function render(payload){
+ activeUiVersion=payload.ui_version||'legacy';
  const registryText=JSON.stringify(payload.registry).replace(/</g,'\\u003c');
  const bridge='let registry='+registryText+';window.addEventListener("message",event=>{if(event.source!==parent||event.origin!=='+JSON.stringify(location.origin)+'||event.data?.type!=="gap-registry-update")return;registry=event.data.registry;window.dispatchEvent(new Event("gap-registry-update"));});window.fetch=async(input)=>{const path=new URL(typeof input==="string"?input:input.url,document.baseURI).pathname;if(path.endsWith("/data/registry.json"))return new Response(JSON.stringify(registry),{headers:{"Content-Type":"application/json"}});throw new Error("Recurso no disponible en esta publicación");};';
  const html=payload.html.replace('<link rel="stylesheet" href="./styles.css">',()=>'<style>'+payload.css+'</style>')
