@@ -176,6 +176,9 @@ function render(payload){
 .history-count b{font-size:17px}.history-count span{font-size:13px;color:#64746b}
 .filters{margin:12px 0}.filters button{cursor:pointer}
 .day>summary{font-size:17px;font-weight:600}.entry>summary{font-size:16px}
+.pdf-day-actions{display:grid;gap:7px;margin:12px 0;padding:12px;background:#edf6ed;border:1px solid #c9dfcd;border-radius:9px}
+.pdf-day-actions button{background:#1f6544;color:#fff;border:0;border-radius:8px;padding:12px;font:600 14px Arial,sans-serif;text-align:left;cursor:pointer}
+.pdf-day-actions small{font-size:12px;line-height:1.5;color:#405e4a}
 .history-outcome{background:#f3f8f3;padding:10px 12px;border-radius:8px;margin:12px 0}.history-outcome p{margin:6px 0}
 .scroll-hint{font-weight:600;color:#365f4b}.history-table-wrap{overflow-x:auto;max-width:100%;border:1px solid #e1e7de;border-radius:8px;-webkit-overflow-scrolling:touch}
 .history-table-wrap table{min-width:980px;width:100%;table-layout:auto}
