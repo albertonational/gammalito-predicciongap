@@ -7,7 +7,8 @@
     "label": "Hoy",
     "headline": "Esperando la evaluación de la sesión",
     "detail": "Si aparece una candidata A+, aquí se mostrará de forma sencilla.",
-    "signal": null
+    "signal": null,
+    "signals": []
   },
   "prospective": {
     "candidates": 0,
