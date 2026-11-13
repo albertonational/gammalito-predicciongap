@@ -3,6 +3,20 @@ import {createSessionStore} from './session.mjs?v=20261031-3';
 const form=document.querySelector('#unlock'),field=document.querySelector('#password'),button=document.querySelector('#submit'),status=document.querySelector('#status');
 const entry=document.querySelector('#entry'),viewer=document.querySelector('#viewer'),frame=document.querySelector('#frame');
 const historyFrame=document.querySelector('#history-frame'),historyToggle=document.querySelector('#history-toggle');
+const labToggle=document.createElement('button');
+labToggle.id='laboratorio-toggle';labToggle.type='button';labToggle.textContent='Laboratorio';labToggle.hidden=true;
+historyToggle.parentElement?.insertBefore?.(labToggle,historyToggle.nextSibling);
+let historyPane=null,labPane=null,activeAux='none';
+function showAux(mode){
+ const show=activeAux===mode?'none':mode;
+ activeAux=show;
+ frame.hidden=show!=='none';historyFrame.hidden=show==='none';
+ if(show==='historial'&&historyPane)historyFrame.replaceChildren(historyPane);
+ if(show==='laboratorio'&&labPane)historyFrame.replaceChildren(labPane);
+ historyToggle.textContent=show==='historial'?'Inicio':'Historial';
+ labToggle.textContent=show==='laboratorio'?'Inicio':'Laboratorio';
+}
+
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
 let session;try{session=createSessionStore();}catch{}
 let attempt=0,liveMaterial=null,liveExpires=0,pollTimer=null,pollBusy=false,lastEnvelope=null,lastPublicationTag=null,activeUiVersion='legacy';
@@ -48,7 +62,7 @@ async function repositoryUpdate(){
 const sessionNote=document.querySelector('#session-note');
 function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
- ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
+ ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
 }
 async function refreshPublication(){
@@ -161,7 +175,7 @@ function render(payload){
   .replace('<link rel="icon" href="./favicon.svg">','')
   .replace('<script type="module" src="./app.js"></script>',()=>'<script>'+safeScript(bridge)+'</script><script type="module">'+safeScript(payload.js)+'</script>');
  const iframe=document.createElement('iframe');iframe.title='Pronósticos y resultados de GAMMAlito';iframe.srcdoc=html;
- frame.replaceChildren(iframe);historyFrame.replaceChildren();historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;
+ frame.replaceChildren(iframe);historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;labToggle.textContent='Laboratorio';labToggle.hidden=!(payload.lab_js&&payload.lab_data);
  if(payload.history_js){
   const h=document.createElement('iframe');h.title='Historial de entradas destacadas';
   const style=`body{margin:0;background:#f4f5f1;color:#233e33;font:15px Arial,sans-serif}main{max-width:1000px;margin:auto;padding:25px}h1{font-size:25px}.filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;background:white;padding:16px;border-radius:12px}.filters label{display:grid;gap:5px;font-size:13px}.filters input,.filters select,.filters button{font:inherit;padding:8px;border:1px solid #bccbb5;border-radius:6px;background:white;color:#233e33}.notice{font-size:13px;color:#64746b;line-height:1.5}.day,.entry{background:white;border:1px solid #dce3d4;border-radius:10px;margin:10px 0;padding:12px}.entry{background:#f9fbf8;margin-left:10px}summary{cursor:pointer;line-height:1.6}summary span{font-size:12px;color:#607065;margin-left:10px}.call{color:#17804e}.put{color:#b44040}.detail{overflow:auto}.detail p{font-size:14px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #e1e7de;text-align:left}td small{display:block;color:#65736b;margin-top:3px}.empty{padding:20px;background:white;border-radius:8px}
@@ -186,7 +200,15 @@ function render(payload){
 .history-table-wrap td{vertical-align:top;min-width:105px}.history-table-wrap td:nth-child(2){min-width:200px}.history-table-wrap td:nth-child(3){min-width:125px}
 @media(max-width:600px){main{padding:14px}th,td{padding:7px;min-width:65px}}`;
   h.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+style+'</style></head><body><main id="history-root"><p>Cargando historial…</p></main><script>'+safeScript(bridge)+'</script><script>'+safeScript(payload.history_js)+'</script></body></html>';
-  historyFrame.replaceChildren(h);
+  historyPane=h;historyFrame.replaceChildren(h);
+ }
+
+ if(payload.lab_js&&payload.lab_data){
+  const lab=document.createElement('iframe');lab.title='Laboratorio de movimientos y Gamma, independiente';
+  const labStyle=`*{box-sizing:border-box}body{margin:0;background:#f4f6f3;color:#233e33;font:15px Arial,sans-serif}main{max-width:1150px;margin:auto;padding:24px}header{background:#e3eee8;padding:20px;border-radius:14px}h1{font-size:24px;margin:0 0 10px}p{line-height:1.55;color:#536b5a}.notice{background:#fff;border-left:4px solid #428369;padding:12px;margin:12px 0;font-size:13px;line-height:1.6}.filters{display:flex;flex-wrap:wrap;gap:14px;align-items:end;padding:16px;background:white;border-radius:12px;margin:12px 0}label{display:grid;gap:6px}select,button{font:inherit;padding:10px;border:1px solid #9cb3a5;border-radius:7px;background:#fff;color:#234735}button{background:#275f49;color:white;cursor:pointer}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}.metrics div{padding:14px;background:#fff;border-radius:10px;border:1px solid #dce5de}.metrics b{font-size:21px;display:block}.metrics small{display:block;color:#65786a;margin-top:6px}.charts{display:grid;grid-template-columns:1fr;gap:12px}.chart{background:#fff;border:1px solid #dce5de;border-radius:12px;padding:14px}.chart svg{width:100%;height:auto;display:block}.chart small{color:#728278}h2{font-size:19px;margin-top:28px}.scroll{overflow:auto;border:1px solid #dce5de;border-radius:9px;background:#fff}table{border-collapse:collapse;width:100%;min-width:850px;font-size:12px}th,td{padding:9px;text-align:left;border-bottom:1px solid #e5eae5;white-space:nowrap}th{background:#e9f2eb}.foot{font-size:12px;margin-top:24px}.empty{padding:18px;background:#fff}@media(max-width:650px){main{padding:12px}.metrics{grid-template-columns:repeat(2,1fr)}header{padding:14px}h1{font-size:20px}}`;
+  const labData=JSON.stringify(payload.lab_data).replace(/</g,'\\u003c');
+  lab.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+labStyle+'</style></head><body><main id="lab-root">Preparando lecturas verificadas...</main><script>window.__LAB_DATA__='+safeScript(labData)+';</script><script>'+safeScript(payload.lab_js)+'</script></body></html>';
+  labPane=lab;
  }
  entry.hidden=true;viewer.hidden=false;status.textContent='';
 }
@@ -214,7 +236,9 @@ form.addEventListener('submit',async event=>{
  catch{status.textContent='No se pudo iniciar el acceso seguro. Usa HTTPS y recarga.';}
  finally{password='';}
 });
-historyToggle.addEventListener('click',()=>{const show=historyFrame.hidden;historyFrame.hidden=!show;frame.hidden=show;historyToggle.textContent=show?'Inicio':'Historial';});
+historyToggle.addEventListener('click',()=>showAux('historial'));
+labToggle.addEventListener?.('click',()=>showAux('laboratorio'));
+
 document.querySelector('#lock').addEventListener('click',()=>closeAccess());
 async function restore(){
  button.disabled=true;
