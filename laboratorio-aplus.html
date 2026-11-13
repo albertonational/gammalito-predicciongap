@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>GAMMA A+ · Laboratorio</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f3;color:#233e33;font:15px Arial,sans-serif}
+main{max-width:760px;margin:auto;padding:18px}header{background:#e7f0e9;border:1px solid #d5e2d7;border-radius:16px;padding:18px}
+h1{font-size:24px;margin:0 0 6px}.sub{color:#617468;margin:0}.status{margin:14px 0;padding:16px;border-radius:14px;background:#fff;border:1px solid #dce5de}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#fff3cd;color:#6d5200;font-size:12px;font-weight:700;letter-spacing:.4px}
+.today{font-size:20px;font-weight:700;margin:12px 0 5px}.detail{color:#617468;line-height:1.5}
+.signal{margin-top:14px;padding:16px;border-radius:12px;background:#244d3d;color:white}.signal b{font-size:22px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}.metric{background:#fff;border:1px solid #dce5de;border-radius:12px;padding:14px}
+.metric b{display:block;font-size:24px}.metric small{color:#65786a}.rule{background:#fff;border:1px solid #dce5de;border-radius:12px;padding:14px;line-height:1.55}
+.recent{margin-top:12px}.item{background:#fff;border:1px solid #dce5de;border-radius:10px;padding:12px;margin:8px 0}
+.muted{color:#718079;font-size:12px}.empty{padding:14px;background:#fff;border:1px dashed #c6d4ca;border-radius:10px;color:#66786d}
+@media(max-width:600px){main{padding:12px}.metric{padding:10px}.metric b{font-size:20px}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<main id="root"><div class="empty">Cargando Laboratorio A+…</div></main>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function render(d){
+ const p=d.prospective||{},t=d.today||{},sig=t.signal,recent=(d.recent||[]).slice(0,5);
+ document.querySelector('#root').innerHTML=
+ '<header><h1>Laboratorio A+</h1><p class="sub">Sólo muestra lo importante. No modifica las señales actuales.</p></header>'+
+ '<section class="status"><span class="pill">'+esc(d.status||'EN PRUEBA')+'</span>'+
+ '<div class="today">'+esc(t.headline||'Sin lectura todavía')+'</div>'+
+ '<div class="detail">'+esc(t.detail||'')+'</div>'+
+ (sig?'<div class="signal"><b>'+esc(sig.ticker)+' · '+esc(sig.side)+'</b><div>'+esc(sig.time_ny||'')+' NY · '+esc(sig.state||'CANDIDATO')+'</div></div>':'')+
+ '</section>'+
+ '<section class="grid"><div class="metric"><b>'+esc(p.candidates||0)+'</b><small>Candidatas</small></div>'+
+ '<div class="metric"><b>'+esc(p.hits||0)+'</b><small>Aciertos</small></div>'+
+ '<div class="metric"><b>'+esc(p.robust||0)+'</b><small>Robustas</small></div></section>'+
+ '<section class="rule"><b>Qué significa A+</b><br>Gamma y Momentum deben alinearse, el precio debe confirmar fuerza en los primeros 5 minutos y después comprobamos si la entrada sigue funcionando con +1 y +5 minutos.</section>'+
+ '<section class="recent"><h2>Últimas A+</h2>'+
+ (recent.length?recent.map(x=>'<div class="item"><b>'+esc(x.ticker)+' · '+esc(x.side)+'</b><div>'+esc(x.date)+' · '+esc(x.time_ny||'')+' NY · '+esc(x.result||x.state||'')+'</div></div>').join(''):'<div class="empty">Todavía no hay una A+ prospectiva registrada.</div>')+
+ '</section><p class="muted">Actualizado: '+esc(d.updated_at||'pendiente')+'</p>';
+}
+fetch('./lab-aplus.json?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(render).catch(()=>{
+ document.querySelector('#root').innerHTML='<div class="empty">El Laboratorio está activo, pero todavía no hay una actualización disponible.</div>';
+});
+</script>
+</body>
+</html>
