@@ -4,7 +4,7 @@ const form=document.querySelector('#unlock'),field=document.querySelector('#pass
 const entry=document.querySelector('#entry'),viewer=document.querySelector('#viewer'),frame=document.querySelector('#frame');
 const historyFrame=document.querySelector('#history-frame'),historyToggle=document.querySelector('#history-toggle');
 const labToggle=document.createElement('button');
-labToggle.id='laboratorio-toggle';labToggle.type='button';labToggle.textContent='Laboratorio A+';labToggle.hidden=true;
+labToggle.id='laboratorio-toggle';labToggle.type='button';labToggle.textContent='Laboratorio';labToggle.hidden=true;
 historyToggle.parentElement?.insertBefore?.(labToggle,historyToggle.nextSibling);
 let historyPane=null,labPane=null,activeAux='none';
 function showAux(mode){
@@ -14,7 +14,7 @@ function showAux(mode){
  if(show==='historial'&&historyPane)historyFrame.replaceChildren(historyPane);
  if(show==='laboratorio'&&labPane)historyFrame.replaceChildren(labPane);
  historyToggle.textContent=show==='historial'?'Inicio':'Historial';
- labToggle.textContent=show==='laboratorio'?'Inicio':'Laboratorio A+';
+ labToggle.textContent=show==='laboratorio'?'Inicio':'Laboratorio';
 }
 
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
@@ -62,7 +62,7 @@ async function repositoryUpdate(){
 const sessionNote=document.querySelector('#session-note');
 function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
- ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio A+';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
+ ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
 }
 async function refreshPublication(){
@@ -175,7 +175,7 @@ function render(payload){
   .replace('<link rel="icon" href="./favicon.svg">','')
   .replace('<script type="module" src="./app.js"></script>',()=>'<script>'+safeScript(bridge)+'</script><script type="module">'+safeScript(payload.js)+'</script>');
  const iframe=document.createElement('iframe');iframe.title='Pronósticos y resultados de GAMMAlito';iframe.srcdoc=html;
- frame.replaceChildren(iframe);historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;labToggle.textContent='Laboratorio A+';labToggle.hidden=false;
+ frame.replaceChildren(iframe);historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;labToggle.textContent='Laboratorio';labToggle.hidden=!(payload.lab_js&&payload.lab_data);
  if(payload.history_js){
   const h=document.createElement('iframe');h.title='Historial de entradas destacadas';
   const style=`body{margin:0;background:#f4f5f1;color:#233e33;font:15px Arial,sans-serif}main{max-width:1000px;margin:auto;padding:25px}h1{font-size:25px}.filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;background:white;padding:16px;border-radius:12px}.filters label{display:grid;gap:5px;font-size:13px}.filters input,.filters select,.filters button{font:inherit;padding:8px;border:1px solid #bccbb5;border-radius:6px;background:white;color:#233e33}.notice{font-size:13px;color:#64746b;line-height:1.5}.day,.entry{background:white;border:1px solid #dce3d4;border-radius:10px;margin:10px 0;padding:12px}.entry{background:#f9fbf8;margin-left:10px}summary{cursor:pointer;line-height:1.6}summary span{font-size:12px;color:#607065;margin-left:10px}.call{color:#17804e}.put{color:#b44040}.detail{overflow:auto}.detail p{font-size:14px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #e1e7de;text-align:left}td small{display:block;color:#65736b;margin-top:3px}.empty{padding:20px;background:white;border-radius:8px}
@@ -210,7 +210,6 @@ function render(payload){
   lab.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+labStyle+'</style></head><body><main id="lab-root">Preparando lecturas verificadas...</main><script>window.__LAB_DATA__='+safeScript(labData)+';</script><script>'+safeScript(payload.lab_js)+'</script></body></html>';
   labPane=lab;
  }
- const simpleLab=document.createElement('iframe');simpleLab.title='Laboratorio GAMMA A+';simpleLab.src='./laboratorio-aplus.html?v=20261113-a1';labPane=simpleLab;labToggle.hidden=false;
  entry.hidden=true;viewer.hidden=false;status.textContent='';
 }
 async function open(material,{restoring=false}={}){
