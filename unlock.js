@@ -6,6 +6,18 @@ const historyFrame=document.querySelector('#history-frame'),historyToggle=docume
 const labToggle=document.createElement('button');
 labToggle.id='laboratorio-toggle';labToggle.type='button';labToggle.textContent='Laboratorio';labToggle.hidden=true;
 historyToggle.parentElement?.insertBefore?.(labToggle,historyToggle.nextSibling);
+const sinHumoToggle=document.createElement('button');
+sinHumoToggle.id='sin-humo-toggle';sinHumoToggle.type='button';sinHumoToggle.textContent='Trading Sin Humo';sinHumoToggle.hidden=true;
+historyToggle.parentElement?.insertBefore?.(sinHumoToggle,labToggle.nextSibling);
+let sinHumoPane=null;
+function createSinHumoPane(){
+ const iframe=document.createElement('iframe');
+ iframe.title='Trading Sin Humo · laboratorio experimental';
+ iframe.setAttribute('sandbox','allow-same-origin');
+ iframe.style.cssText='width:100%;height:calc(100dvh - 75px);border:0;background:#f4f5f1';
+ iframe.srcdoc=`<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f4f5f1;color:#233e33;font:15px Arial,sans-serif}main{max-width:1050px;margin:auto;padding:24px}h1{font-size:25px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{background:white;border:1px solid #dce3d4;border-radius:13px;padding:18px}p{line-height:1.55}.warning{color:#a34032}.muted{color:#687368}.status{font-weight:bold}a{color:#145c91}</style><main><h1>Trading Sin Humo · Laboratorio</h1><p class="warning"><strong>EXPERIMENTAL · SIN SEÑALES ACTIVAS.</strong> La lectura automática de Discord, la confirmación de velas y el envío a Telegram todavía no están conectados. No ejecutar operaciones con este panel.</p><div class="grid"><section class="card"><h2>SPY · Ruta 17 nov 2026</h2><p>Spot de referencia: $737.20 · Gamma negativo</p><p>King $730 · Put Wall $740 · Flip $741 · Call Wall $750</p><p><strong>Gatillo CALL publicado:</strong> cierre de 15 minutos sobre $741.</p><p>Invalidación publicada: cierre bajo $740. Objetivo potencial del mapa: $750.</p><p class="status">ESPERAR · Sin confirmación completa de flujo/1H</p></section><section class="card"><h2>QQQ · Ruta 17 nov 2026</h2><p>Spot de referencia: $659.07 · Gamma negativo</p><p>King $650 · Put Wall $680 · Flip $662 · Call Wall $680</p><p><strong>Gatillo CALL publicado:</strong> cierre de 15 minutos sobre $662.</p><p class="warning"><strong>BLOQUEADO:</strong> invalidación publicada bajo $680 contradice el gatillo de $662. Requiere aclaración antes de cualquier alerta.</p><p class="status">ESPERAR · Sin señal verificada</p></section></div><h2>Protocolo de validación</h2><p>Registrar los niveles antes del movimiento; exigir cierre de 15 minutos y al menos una confirmación independiente (mapa, 1H o flujo). Objetivo hacia el primer muro o King con distancia mínima de 0.5%. Conservar tanto aciertos como fallos, sin reconstrucciones retrospectivas.</p><p class="muted">Fuente: <a href="https://discord.com/channels/1566272149671378954/1566541580184191130">#pide-tu-ruta</a>. Las ganancias de opciones anunciadas por terceros no están verificadas. Panel estático de observación; no actualiza precios automáticamente.</p></main></html>`;
+ return iframe;
+}
 let historyPane=null,labPane=null,activeAux='none';
 function showAux(mode){
  const show=activeAux===mode?'none':mode;
@@ -13,8 +25,10 @@ function showAux(mode){
  frame.hidden=show!=='none';historyFrame.hidden=show==='none';
  if(show==='historial'&&historyPane)historyFrame.replaceChildren(historyPane);
  if(show==='laboratorio'&&labPane)historyFrame.replaceChildren(labPane);
+ if(show==='sin-humo'&&sinHumoPane)historyFrame.replaceChildren(sinHumoPane);
  historyToggle.textContent=show==='historial'?'Inicio':'Historial';
  labToggle.textContent=show==='laboratorio'?'Inicio':'Laboratorio';
+ sinHumoToggle.textContent=show==='sin-humo'?'Inicio':'Trading Sin Humo';
 }
 
 const safeScript=text=>text.replace(/<\/script/gi,'<\\/script');
@@ -62,7 +76,7 @@ async function repositoryUpdate(){
 const sessionNote=document.querySelector('#session-note');
 function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
- ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
+ ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;sinHumoPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;sinHumoToggle.hidden=true;sinHumoToggle.textContent='Trading Sin Humo';historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
 }
 async function refreshPublication(){
@@ -175,7 +189,7 @@ function render(payload){
   .replace('<link rel="icon" href="./favicon.svg">','')
   .replace('<script type="module" src="./app.js"></script>',()=>'<script>'+safeScript(bridge)+'</script><script type="module">'+safeScript(payload.js)+'</script>');
  const iframe=document.createElement('iframe');iframe.title='Pronósticos y resultados de GAMMAlito';iframe.srcdoc=html;
- frame.replaceChildren(iframe);historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;labToggle.textContent='Laboratorio';labToggle.hidden=!(payload.lab_js&&payload.lab_data);
+ frame.replaceChildren(iframe);historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.textContent='Historial';historyToggle.hidden=!payload.history_js;labToggle.textContent='Laboratorio';labToggle.hidden=!(payload.lab_js&&payload.lab_data);sinHumoToggle.hidden=false;sinHumoToggle.textContent='Trading Sin Humo';sinHumoPane=createSinHumoPane();
  if(payload.history_js){
   const h=document.createElement('iframe');h.title='Historial de entradas destacadas';
   const style=`body{margin:0;background:#f4f5f1;color:#233e33;font:15px Arial,sans-serif}main{max-width:1000px;margin:auto;padding:25px}h1{font-size:25px}.filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;background:white;padding:16px;border-radius:12px}.filters label{display:grid;gap:5px;font-size:13px}.filters input,.filters select,.filters button{font:inherit;padding:8px;border:1px solid #bccbb5;border-radius:6px;background:white;color:#233e33}.notice{font-size:13px;color:#64746b;line-height:1.5}.day,.entry{background:white;border:1px solid #dce3d4;border-radius:10px;margin:10px 0;padding:12px}.entry{background:#f9fbf8;margin-left:10px}summary{cursor:pointer;line-height:1.6}summary span{font-size:12px;color:#607065;margin-left:10px}.call{color:#17804e}.put{color:#b44040}.detail{overflow:auto}.detail p{font-size:14px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid #e1e7de;text-align:left}td small{display:block;color:#65736b;margin-top:3px}.empty{padding:20px;background:white;border-radius:8px}
@@ -238,6 +252,7 @@ form.addEventListener('submit',async event=>{
 });
 historyToggle.addEventListener('click',()=>showAux('historial'));
 labToggle.addEventListener?.('click',()=>showAux('laboratorio'));
+sinHumoToggle.addEventListener('click',()=>showAux('sin-humo'));
 
 document.querySelector('#lock').addEventListener('click',()=>closeAccess());
 async function restore(){
