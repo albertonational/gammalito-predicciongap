@@ -6,6 +6,14 @@ const historyFrame=document.querySelector('#history-frame'),historyToggle=docume
 const labToggle=document.createElement('button');
 labToggle.id='laboratorio-toggle';labToggle.type='button';labToggle.textContent='Laboratorio';labToggle.hidden=true;
 historyToggle.parentElement?.insertBefore?.(labToggle,historyToggle.nextSibling);
+const sinHumoToggle=document.createElement('button');
+sinHumoToggle.type='button';sinHumoToggle.textContent='Trading Sin Humo';sinHumoToggle.hidden=true;
+labToggle.parentElement?.insertBefore?.(sinHumoToggle,labToggle.nextSibling);
+sinHumoToggle.addEventListener?.('click',()=>{
+ if(activeAux!=='none')showAux(activeAux);
+ const tabs=frame.firstElementChild?.contentDocument?.querySelectorAll?.('button[role="tab"]');
+ Array.from(tabs||[]).find(tab=>tab.textContent.includes('Trading Sin Humo'))?.click();
+});
 let historyPane=null,labPane=null,activeAux='none';
 function showAux(mode){
  const show=activeAux===mode?'none':mode;
@@ -62,7 +70,7 @@ async function repositoryUpdate(){
 const sessionNote=document.querySelector('#session-note');
 function stopUpdates(){if(pollTimer!==null)clearInterval(pollTimer);pollTimer=null;pendingView=null;nextBackupCheck=0;seenDirect=null;seenBackup=null;liveHash=null;latestRegistryTime=0;liveMaterial=null;lastEnvelope=null;lastPublicationTag=null;}
 async function closeAccess(message='Acceso cerrado.'){
- ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
+ ++attempt;stopUpdates();frame.replaceChildren();historyFrame.replaceChildren();historyPane=null;labPane=null;activeAux='none';historyFrame.hidden=true;frame.hidden=false;historyToggle.hidden=true;historyToggle.textContent='Historial';labToggle.hidden=true;labToggle.textContent='Laboratorio';sinHumoToggle.hidden=true;viewer.hidden=true;entry.hidden=false;field.value='';status.textContent=message;button.disabled=false;field.focus();
  try{await session?.clear();}catch{}
 }
 async function refreshPublication(){
@@ -210,7 +218,7 @@ function render(payload){
   lab.srcdoc='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+labStyle+'</style></head><body><main id="lab-root">Preparando lecturas verificadas...</main><script>'+safeScript(bridge)+'</script><script>window.__LAB_DATA__='+safeScript(labData)+';</script><script>'+safeScript(payload.lab_js)+'</script></body></html>';
   labPane=lab;
  }
- entry.hidden=true;viewer.hidden=false;status.textContent='';
+ sinHumoToggle.hidden=false;entry.hidden=true;viewer.hidden=false;status.textContent='';
 }
 async function open(material,{restoring=false}={}){
  const turn=++attempt;button.disabled=true;status.textContent=restoring?'Restaurando acceso…':'Abriendo…';let phase='download';
